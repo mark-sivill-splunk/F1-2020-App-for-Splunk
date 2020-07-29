@@ -1,0 +1,14 @@
+<nav search_view="search" color="FF1E00">
+  <collection label="F1 2020">
+    <view name="f1_2020_active_rigs" default="true" />
+    <view name="f1_2020_historic_rigs" />
+    <view name="f1_2020_in_car" />
+    <view name="f1_2020_raw_telemetry" />
+    <view name="f1_2020_add_on_performance" />
+  </collection>
+  <view name="search" />
+  <view name="datasets" />
+  <view name="reports" />
+  <view name="alerts" />
+  <view name="dashboards" />
+</nav>

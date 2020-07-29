@@ -1,0 +1,33 @@
+<dashboard theme="dark">
+  <label>Active Rigs</label>
+  <description>Show game machines that have sent data in last 24 hours</description>
+  <row>
+    <panel>
+      <title>Active Rigs</title>
+      <table>
+        <title>Click on row to see "In Car" dashboard</title>
+        <search>
+          <query>| tstats latest(_time) as latest where index=* sourcetype=codemasters:f1:2020:* by host source 
+| eval latest=strftime(latest,"%Y-%m-%d %H:%M:%S")
+| fields source host latest
+| sort - latest
+| rename host as Host, source as Source, latest as "Last Telemetry Sent"</query>
+         <earliest>-24h@h</earliest>
+         <latest>now</latest>
+         <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <link target="_blank">/app/f1_2020_app/f1_2020_in_car?form.host=$row.Host$&amp;form.source=$row.Source$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+</dashboard>

@@ -1,0 +1,247 @@
+<form theme="dark">
+  <label>In Car</label>
+  <search id="base_search_dropdown">
+    <query>| tstats latest(_time) where index=* sourcetype=codemasters:f1:2020:* by host source | fields + host source</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+  </search>
+  <search id="base_search">
+    <query>index=* host=$host|s$ source=$source|s$  ( sourcetype=codemasters:f1:2020:session:* OR sourcetype=codemasters:f1:2020:participants:* OR sourcetype=codemasters:f1:2020:lap:* OR sourcetype=codemasters:f1:2020:car_telemetry:* OR sourcetype=codemasters:f1:2020:car_status:* )
+| eventstats latest(_time) as latest_time by sourcetype host 
+| where latest_time = _time 
+| spath input=_raw path=header{}.playerCarIndex output=playerCarIndex
+| spath input=_raw path=header{}.packetId output=packetId 
+| fields _raw _time source sourcetype host packetId playerCarIndex</query>
+    <earliest>$time_picker.earliest$</earliest>
+    <latest>$time_picker.latest$</latest>
+    <sampleRatio>1</sampleRatio>
+  </search>
+  <fieldset submitButton="false">
+    <input type="dropdown" token="host" searchWhenChanged="true">
+      <label>Hosts found in last 24 hours</label>
+      <fieldForLabel>host</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+      <search base="base_search_dropdown">
+        <query>dedup host</query>
+      </search>
+      <selectFirstChoice>true</selectFirstChoice>
+    </input>
+    <input type="dropdown" token="source" searchWhenChanged="true">
+      <label>Sources found in last 24 hours</label>
+      <fieldForLabel>source</fieldForLabel>
+      <fieldForValue>source</fieldForValue>
+      <search base="base_search_dropdown">
+        <query>where host=$host|s$</query>
+      </search>
+      <selectFirstChoice>true</selectFirstChoice>
+    </input>
+    <input type="time" token="time_picker" searchWhenChanged="true">
+      <label>Time window for telemetry</label>
+      <default>
+        <earliest>rt-10s</earliest>
+        <latest>rt</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Session</title>
+      <table>
+        <search base="base_search">
+          <query>| where packetId = 1
+          | spath input=_raw path=formula output=formula 
+          | spath input=_raw path=safetyCarStatus output=safetyCarStatus
+          | spath input=_raw path=sessionType output=sessionType
+          | spath input=_raw path=trackId output=trackId
+          | spath input=_raw path=weather output=weather
+          | lookup f1_2020_formula formula
+          | lookup f1_2020_safetycarstatus safetyCarStatus
+          | lookup f1_2020_sessiontype sessionType
+          | lookup f1_2020_trackid trackId
+          | lookup f1_2020_weather weather
+          | table formulaName trackIdName sessionTypeName  weatherName safetyCarStatusName
+          | rename formulaName as Formula, trackIdName as Track, safetyCarStatusName as "Safety Car Status", sessionTypeName as "Session Type", weatherName as Weather
+          </query>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Participant</title>
+      <table>
+        <search base="base_search">
+          <query>| where packetId = 4
+          | spath input=_raw path=participants{} output=participants 
+          | eval participants=mvindex(participants,playerCarIndex) 
+          | spath input=participants path=teamId output=teamId 
+          | spath input=participants path=nationality output=nationality 
+          | spath input=participants path=driverId output=driverId 
+          | spath input=participants path=name output=username 
+          | lookup f1_2020_teamid teamId 
+          | lookup f1_2020_nationality nationality 
+          | lookup f1_2020_driverid driverId 
+          | table teamIdName driverIdName username nationalityName
+          | rename teamIdName as Team, nationalityName as Nationality, driverIdName as "F1 Driver Name", username as "User Driver Name"
+          </query>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Lap</title>
+      <table>
+        <search base="base_search">
+          <query>| where packetId = 2
+          | spath input=_raw path=lapData{} output=lapData 
+          | eval lapData=mvindex(lapData,playerCarIndex) 
+          | spath input=lapData path=currentLapTime output=currentLapTime 
+          | spath input=lapData path=currentLapInvalid output=currentLapInvalid 
+          | spath input=lapData path=lastLapTime output=lastLapTime 
+          | spath input=lapData path=bestLapTime output=bestLapTime 
+          | spath input=lapData path=sector1TimeInMS output=sector1TimeInMS 
+          | spath input=lapData path=sector2TimeInMS output=sector2TimeInMS
+          | spath input=lapData path=pitStatus output=pitStatus 
+          | spath input=lapData path=driverStatus output=driverStatus 
+          | spath input=lapData path=resultStatus output=resultStatus 
+          | spath input=lapData path=sector output=sector
+          | eval currentLapTimeFormatted = strftime(currentLapTime, "%M:%S:%3N")
+          | eval currentLapInvalidFormatted = if ( currentLapInvalid == 0, "No", "Yes")
+          | eval lastLapTimeFormatted = strftime(lastLapTime, "%M:%S:%3N")
+          | eval bestLapTimeFormatted = strftime(bestLapTime, "%M:%S:%3N")
+          | eval sector1TimeFormatted = strftime(sector1TimeInMS/1000, "%M:%S:%3N")
+          | eval sector2TimeFormatted = strftime(sector2TimeInMS/1000, "%M:%S:%3N")
+          | lookup f1_2020_pitstatus pitStatus
+          | lookup f1_2020_driverstatus driverStatus
+          | lookup f1_2020_resultstatus resultStatus
+          | lookup f1_2020_sector sector
+          | table currentLapTimeFormatted currentLapInvalidFormatted lastLapTimeFormatted bestLapTimeFormatted sectorName sector1TimeFormatted sector2TimeFormatted pitStatusName driverStatusName resultStatusName 
+          | rename currentLapTimeFormatted as "Current Lap Time", currentLapInvalidFormatted as "Invalid Lap", lastLapTimeFormatted as "Last Lap Time", bestLapTimeFormatted as "Best Lap Time", sector1TimeFormatted as "Sector 1 Time", sector2TimeFormatted as "Sector 2 Time", pitStatusName as "Pit Status", sectorName as Sector, resultStatusName as "Result Status", driverStatusName as "Driver Status"
+          </query>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Telemetry</title>
+      <table>
+        <search base="base_search">
+          <query>| where packetId = 6
+          | spath input=_raw path=carTelemetryData{} output=carTelemetryData 
+          | eval carTelemetryData=mvindex(carTelemetryData,playerCarIndex) 
+          | spath input=carTelemetryData path=speed output=speed 
+          | spath input=carTelemetryData path=throttle output=throttle 
+          | spath input=carTelemetryData path=brake output=brake 
+          | spath input=carTelemetryData path=gear output=gear
+          | spath input=carTelemetryData path=engineRPM output=engineRPM  
+          | spath input=carTelemetryData path=drs output=drs 
+          | spath input=carTelemetryData path=surfaceType{0} output=surfaceTypeRL 
+          | spath input=carTelemetryData path=surfaceType{1} output=surfaceTypeRR 
+          | spath input=carTelemetryData path=surfaceType{2} output=surfaceTypeFL
+          | spath input=carTelemetryData path=surfaceType{3} output=surfaceTypeFR
+          | lookup f1_2020_surfacetype surfaceType as surfaceTypeRL outputnew surfaceTypeName as surfaceTypeNameRL  
+          | lookup f1_2020_surfacetype surfaceType as surfaceTypeRR outputnew surfaceTypeName as surfaceTypeNameRR  
+          | lookup f1_2020_surfacetype surfaceType as surfaceTypeFL outputnew surfaceTypeName as surfaceTypeNameFL  
+          | lookup f1_2020_surfacetype surfaceType as surfaceTypeFR outputnew surfaceTypeName as surfaceTypeNameFR  
+          | eval drs = if(drs==1,"Yes","No")
+          | eval brake = round(brake * 100,0)
+          | eval throttle = round(throttle * 100,0)
+          | table speed gear throttle brake engineRPM drs surfaceTypeNameRL surfaceTypeNameRR surfaceTypeNameFL surfaceTypeNameFR
+          | rename speed as "Speed in kph", gear as Gear, throttle as Throttle, brake as Brake, engineRPM as "Engine RPM", drs as "DRS", surfaceTypeNameRL as "Surface Type (RL)", surfaceTypeNameRR as "Surface Type (RR)", surfaceTypeNameFL as "Surface Type (FL)", surfaceTypeNameFR as "Surface Type (FR)",
+          </query>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Car Status</title>
+      <table>
+        <search base="base_search">
+          <query>| where packetId = 7
+          | spath input=_raw path=carStatusData{} output=carStatusData 
+          | eval carStatusData=mvindex(carStatusData,playerCarIndex) 
+          | spath input=carStatusData path=actualTyreCompound output=actualTyreCompound 
+          | spath input=carStatusData path=visualTyreCompound output=visualTyreCompound 
+          | spath input=carStatusData path=ersDeployMode output=ersDeployMode 
+          | spath input=carStatusData path=fuelMix output=fuelMix 
+          | spath input=carStatusData path=vehicleFiaFlags output=vehicleFiaFlags 
+          | spath input=carStatusData path=maxRPM output=maxRPM 
+          | spath input=carStatusData path=idleRPM output=idleRPM 
+          | spath input=carStatusData path=drsAllowed output=drsAllowed 
+          | spath input=carStatusData path=tractionControl output=tractionControl 
+          | lookup f1_2020_drsallowed drsAllowed
+          | lookup f1_2020_actualtyrecompound actualTyreCompound
+          | lookup f1_2020_visualtyrecompound visualTyreCompound
+          | lookup f1_2020_ersdeploymode ersDeployMode
+          | lookup f1_2020_fuelmix fuelMix
+          | lookup f1_2020_vehiclefiaflags vehicleFiaFlags
+          | lookup f1_2020_tractioncontrol tractionControl
+          | table maxRPM idleRPM drsAllowedName actualTyreCompoundName visualTyreCompoundName ersDeployModeName fuelMixName vehicleFiaFlagsName tractionControlName
+          | rename maxRPM as "Max RPM", idleRPM as "Idle RPM", drsAllowedName as "DRS Allowed", actualTyreCompoundName as "Actual Tyre Compund", visualTyreCompoundName as "Visual Tyre Compound", ersDeployModeName as "ERS Deploy Mode", fuelMixName as "Fuel Mix", vehicleFiaFlagsName as "FIA Flag", tractionControlName as "Traction Control"
+          </query>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Button</title>
+      <table>
+        <search base="base_search">
+          <query>| where packetId = 6
+          | spath input=_raw path=buttonStatus output=buttonStatus
+          | `f1_2020_buttonstatus_lookup`
+          | eval pressed = if (buttonStatus = 0, "False", "True")
+          | table pressed, buttonStatus*
+          | rename buttonStatus* as *, pressed as Pressed
+          </query>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>

@@ -1,0 +1,37 @@
+<form theme="dark">
+  <label>Historic Rigs</label>
+  <description>Show game machines that have sent data</description>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="time_picker" searchWhenChanged="true">
+      <label>Time</label>
+      <default>
+        <earliest>-7d@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Historic Rigs</title>
+      <table>
+        <search>
+          <query>| tstats latest(_time) as latest where index=* sourcetype=codemasters:f1:2020:* by host source 
+| eval latest=strftime(latest,"%Y-%m-%d %H:%M:%S")
+| fields source host latest
+| sort - latest
+| rename host as Host, source as Source, latest as "Last Telemetry Sent"</query>
+          <earliest>$time_picker.earliest$</earliest>
+          <latest>$time_picker.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>
